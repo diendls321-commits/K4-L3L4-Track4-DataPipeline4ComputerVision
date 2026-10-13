@@ -1,0 +1,107 @@
+# Bước 1 — Bronze
+MSSV trong .env và container: 2A202602615
+Lệnh: scripts/lab.sh step 1 --reset (thực thi lệnh Python tương đương trong container Airflow)
+
+đã xoá 2343 đối tượng trong lake
+
+==============================================================================
+Bước 1 · BRONZE: ghi nguyên bản, chỉ thêm, chạy lại không đổi gì
+==============================================================================
+  {'drive': 'drive_a', 'video': 'ingested', 'telemetry_rows': 3021}
+  {'drive': 'drive_b', 'video': 'ingested', 'telemetry_rows': 3234}
+  {'trips': 26}
+  (chạy lại ngay một lần nữa, mọi thứ phải báo 'already present'):
+  {'drive': 'drive_a', 'video': 'already present', 'telemetry_rows': 'already present'}
+
+> Số dòng của từng bảng bronze
+bang             so_dong
+---------------  -------
+raw_telemetry_a  3021
+raw_telemetry_b  3234
+trips_raw        26
+video_files      2
+
+> Hai nguồn telemetry khác nhau thế nào (3 dòng đầu mỗi bảng, cột thô)
+ts_utc                    speed_mps  heading_deg  lat        lon        alt_m  acc_x  acc_y  gas    brake  steer   drive_id  _source_file     _batch_id     _row_no  _ingested_at
+------------------------  ---------  -----------  ---------  ---------  -----  -----  -----  -----  -----  ------  --------  ---------------  ------------  -------  --------------------------------
+2025-10-07T08:00:00.014Z  1.213      292.3385     48.582375  13.396210  48.6   0.360  0.380  0.028  0.000  -0.553  drive_a   telemetry_a.csv  17f098d6bbb1  0        2026-10-13 03:57:13.650548+00:00
+2025-10-07T08:00:00.091Z  1.224      293.8495     48.582375  13.396208  48.6   0.390  0.500  0.047  0.000  -0.553  drive_a   telemetry_a.csv  17f098d6bbb1  1        2026-10-13 03:57:13.650548+00:00
+timestamp_ms   spd_kmh  hdg      latitude   longitude  altitude  ax     ay      throttle_pct  brake_pct  steering  drive_id  _source_file     _batch_id     _row_no  _ingested_at
+-------------  -------  -------  ---------  ---------  --------  -----  ------  ------------  ---------  --------  --------  ---------------  ------------  -------  --------------------------------
+1759933801509  55.11    80.6009  48.577030  13.454629  48.6      0.140  -0.420  2.0           0.0        -0.009    drive_b   telemetry_b.csv  844e983d0ded  0        2026-10-13 03:57:13.957299+00:00
+1759933801590  54.95    79.4354  48.577034  13.454650  48.6      0.220  -0.490  2.0           0.0        -0.009    drive_b   telemetry_b.csv  844e983d0ded  1        2026-10-13 03:57:13.957299+00:00
+
+CẦN THẤY: 3021 dòng (A) và 3234 dòng (B); B dùng tên cột, đơn vị và timestamp khác A; chạy lại không thêm dòng nào.
+
+--- Kiểm tra tự động của module 1 (verify --module 1) ---
+
+Module 1 · bronze
+  PASS  bronze raw_telemetry rows == CSV rows (drive_a)  csv=3021
+  PASS  bronze raw_telemetry rows == CSV rows (drive_b)  csv=3234
+  PASS  bronze keeps each video once (sha256 unique)     2 rows
+  PASS  bronze video sha256 matches the original file
+  PASS  bronze trips == 26
+
+5/5 checks passed
+{"ok": true}
+
+$ scripts/lab.sh cli ingest --drive drive_b
+{"drive": "drive_b", "video": "already present", "telemetry_rows": "already present"}
+
+$ scripts/lab.sh cli history bronze.raw_telemetry_a
+[{"version": 0, "operation": "WRITE", "rows_added": 3021, "predicate": null}]
+
+$ scripts/lab.sh cli history bronze.raw_telemetry_b
+[{"version": 0, "operation": "WRITE", "rows_added": 3234, "predicate": null}]
+
+$ scripts/lab.sh cli sql select drive_id, telemetry_clock_offset_ms, sha256, uri from lake.bronze_video_files order by drive_id
+drive_id  telemetry_clock_offset_ms  sha256                                    uri
+--------  -------------------------  ----------------------------------------  --------------------------------------
+drive_a   0                          636ba1a98dfc5ba665d1c935e1d2064e69f4df36  s3://lake/bronze/video/drive_a/raw.mp4
+drive_b   1500                       bfa62703f645ff77a8578ae3fc74a00881140d38  s3://lake/bronze/video/drive_b/raw.mp4
+
+$ scripts/lab.sh cli sql describe lake.bronze_raw_telemetry_a
+column_name   column_type               null  key  default  extra
+------------  ------------------------  ----  ---  -------  -----
+ts_utc        VARCHAR                   YES
+speed_mps     VARCHAR                   YES
+heading_deg   VARCHAR                   YES
+lat           VARCHAR                   YES
+lon           VARCHAR                   YES
+alt_m         VARCHAR                   YES
+acc_x         VARCHAR                   YES
+acc_y         VARCHAR                   YES
+gas           VARCHAR                   YES
+brake         VARCHAR                   YES
+steer         VARCHAR                   YES
+drive_id      VARCHAR                   YES
+_source_file  VARCHAR                   YES
+_batch_id     VARCHAR                   YES
+_row_no       BIGINT                    YES
+_ingested_at  TIMESTAMP WITH TIME ZONE  YES
+
+$ scripts/lab.sh cli sql describe lake.bronze_raw_telemetry_b
+column_name   column_type               null  key  default  extra
+------------  ------------------------  ----  ---  -------  -----
+timestamp_ms  VARCHAR                   YES
+spd_kmh       VARCHAR                   YES
+hdg           VARCHAR                   YES
+latitude      VARCHAR                   YES
+longitude     VARCHAR                   YES
+altitude      VARCHAR                   YES
+ax            VARCHAR                   YES
+ay            VARCHAR                   YES
+throttle_pct  VARCHAR                   YES
+brake_pct     VARCHAR                   YES
+steering      VARCHAR                   YES
+drive_id      VARCHAR                   YES
+_source_file  VARCHAR                   YES
+_batch_id     VARCHAR                   YES
+_row_no       BIGINT                    YES
+_ingested_at  TIMESTAMP WITH TIME ZONE  YES
+
+$ scripts/lab.sh cli sql select 'drive_a' as drive_id, count(*) as rows from lake.bronze_raw_telemetry_a union all select 'drive_b', count(*) from lake.bronze_raw_telemetry_b
+drive_id  rows
+--------  ----
+drive_a   3021
+drive_b   3234

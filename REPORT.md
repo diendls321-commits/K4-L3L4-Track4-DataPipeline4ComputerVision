@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Họ và tên | `<điền>` |
-| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `<điền>` |
-| GitHub | `<điền: tên tài khoản>` |
+| Họ và tên | Nguyễn Văn Diện |
+| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602615` |
+| GitHub | `diendls321-commits` |
 | Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
 
 ## Kết quả cuối
@@ -21,7 +21,25 @@
 ### Câu 1
 Liệt kê **ít nhất 4 khác biệt** giữa telemetry nguồn A và nguồn B mà bạn thấy ở bronze. Vì sao pipeline giữ **mỗi nguồn một bảng bronze** và để mọi cột ở dạng chữ, thay vì gộp và ép kiểu ngay?
 
-(trả lời ở đây)
+Nguồn A có 3.021 dòng, B có 3.234 dòng; hai bảng có các khác biệt sau:
+
+| Thuộc tính | Nguồn A | Nguồn B |
+|---|---|---|
+| Thời gian | `ts_utc`, chuỗi ISO UTC, ví dụ `2025-10-07T08:00:00.014Z` | `timestamp_ms`, epoch mili giây, ví dụ `1759933801509` |
+| Tốc độ | `speed_mps`, m/s | `spd_kmh`, km/h |
+| Hướng | `heading_deg`, độ | `hdg`, độ |
+| Vị trí và cao độ | `lat`, `lon`, `alt_m` | `latitude`, `longitude`, `altitude` |
+| Gia tốc | `acc_x`, `acc_y` | `ax`, `ay` |
+| Bàn đạp ga/phanh | `gas`, `brake`, tỷ lệ 0–1 | `throttle_pct`, `brake_pct`, phần trăm 0–100 |
+| Góc lái | `steer` | `steering` |
+| Đồng hồ telemetry so với video | Độ lệch khai báo 0 ms | Độ lệch khai báo +1.500 ms, chưa được trừ ở Bronze |
+
+Mỗi nguồn có bảng Bronze riêng để giữ đúng schema gốc, giúp truy vết và xử lý lại khi quy tắc chuẩn hoá thay đổi.
+Các cột dữ liệu CSV được giữ ở dạng `VARCHAR`, kể cả ô trống, để không mất dữ liệu hoặc làm hỏng ingest khi gặp giá trị sai; việc ép kiểu, đổi đơn vị và cách ly lỗi thực hiện ở Silver.
+Schema thực tế có ngoại lệ ở metadata do pipeline tạo: `_row_no` là `BIGINT`, `_ingested_at` là timestamp có múi giờ; bảng metadata video cũng có cột số.
+Sau khi nạp lại cả A và B, video và telemetry đều báo `already present`, số dòng vẫn 3.021/3.234; mỗi bảng telemetry chỉ có một commit Delta (`version=0`).
+Pipeline nhận diện batch bằng băm SHA-256 của nội dung (dùng 12 ký tự đầu làm `_batch_id`); bảng video giữ đủ SHA-256 và con trỏ, còn video gốc nằm ở `s3://lake/bronze/video/<drive>/raw.mp4`.
+Bước 1 đạt **5/5 checks passed**; đầu ra và truy vấn kiểm chứng được lưu tại [`report/evidence/step1_bronze.txt`](report/evidence/step1_bronze.txt).
 
 ## Bước 2 · Silver telemetry
 
