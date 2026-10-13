@@ -11,8 +11,8 @@
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `<điền>`  (phải khớp `report/evidence/run_summary.json`)
-- Số khung hình train / val / test của bạn: `<điền>`
+- `dataset_version` của bạn: `b3bd5bc6347a` (đã kiểm chứng ở bước 4; khớp `report/evidence/run_summary.json` từ bước 0).
+- Số khung hình train / val / test của bạn: **692 / 172 / 155** (tổng **1.019** khung, thuộc 26 trip).
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
 - Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
 
@@ -105,17 +105,42 @@ Join ASOF theo event time cho độ trễ trung bình A/B **66/73 ms**; cực đ
 ### Câu 6
 Dựa vào `leakage.json`: chia theo khung hình làm bao nhiêu trip bị chia cắt, so với chia theo trip? Vì sao điều này làm điểm kiểm thử đẹp một cách giả tạo?
 
-(trả lời ở đây)
+Thí nghiệm trên **1.019 khung đạt chất lượng, thuộc 26 trip**: chia theo khung hình làm **26/26 trip** nằm ở nhiều split, và cả **26 trip** đều có ảnh ở train lẫn test.
+Chia theo trip như Gold cho **0 trip bị chia cắt**; mỗi drive có 9 trip train, 2 trip val và 2 trip test, tổng 18/4/4 trip.
+Các khung gần nhau trong cùng chuyến có bối cảnh, góc camera và vật thể tương tự; chia chúng sang hai tập khiến mô hình có thể dựa vào cảnh đã thấy thay vì tổng quát hoá sang chuyến mới.
+Vì vậy điểm test có thể cao giả tạo so với khả năng hoạt động trên cảnh mới; thí nghiệm này chứng minh rò rỉ trip, chưa đo mức chênh lệch điểm của một mô hình cụ thể.
+Bằng chứng gắn với MSSV `2A202602615` nằm trong [`leakage.json`](report/evidence/leakage.json) và [`step4_leakage.txt`](report/evidence/step4_leakage.txt).
 
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+Lần xuất đầu và lần chạy lại `export-dataset` đều cho **`b3bd5bc6347a`**, với train/val/test **692/172/155 ảnh**. Băm dựa trên nội dung xác định dataset giúp nhận diện cùng một kết quả dù chạy vào thời điểm khác; ngày giờ hay số đếm chỉ nhận diện lần chạy.
+Cụ thể, mã hiện tại sắp xếp theo `frame_id`, ghép từng dòng `frame_id|split`, rồi lấy 12 ký tự đầu của SHA-256. Vì vậy version định danh tập khung và cách chia split, không phải băm toàn bộ byte ảnh, telemetry hay lineage.
+MSSV được ghép với `trip_id` để tính MD5 xếp thứ tự trip trong từng drive, sau đó chia train/val/test; đổi MSSV có thể đổi trip thuộc từng split và số ảnh mỗi split dù tổng ảnh giữ nguyên.
+Đổi tạm sang **`2A202602615-test`** cho version **`cafe62e1005c`**, số ảnh **693/175/151**; tổng vẫn **1.019 ảnh**, số trip vẫn **18/4/4**. Đây là tác động đã đo được của MSSV lên cách chia dataset.
+Sau khi khôi phục nguyên vẹn `.env` và áp dụng lại Docker với **`2A202602615`**, chạy lại bước 4 trả về **`b3bd5bc6347a`**, **692/172/155 ảnh** và đạt **7/7 kiểm tra** như ban đầu.
+Kết quả và log của lần thử/lần khôi phục được lưu tại [`step4_alternate_id.json`](report/evidence/step4_alternate_id.json), [`step4_restored.json`](report/evidence/step4_restored.json) và [`step4_repeat_export.txt`](report/evidence/step4_repeat_export.txt).
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
+Manifest lưu ở [`step4_manifest.json`](report/evidence/step4_manifest.json) cho dataset **`b3bd5bc6347a`** gồm **436 ảnh drive A + 583 ảnh drive B = 1.019 ảnh**; lineage tại lần xuất bước 4 ghi các phiên bản bảng sau:
+
+| Bảng đầu vào | Delta version |
+|---|---:|
+| `bronze.raw_telemetry_a` | 0 |
+| `bronze.raw_telemetry_b` | 0 |
+| `bronze.trips_raw` | 0 |
+| `bronze.video_files` | 1 |
+| `silver.frames` | 27 |
+| `silver.telemetry` | 0 |
+| `silver.frames_flagged` | 0 |
+| `silver.frame_telemetry` | 0 |
+
+SHA-256 video A: `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`; video B: `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`.
+Manifest ghi luật loại khung đen, mờ, gần trùng, mất đồng bộ; chia theo trip, phân tầng theo drive và thứ tự MD5. Dataset có train/val/test **692/172/155 ảnh**, **18/4/4 trip**.
+Để tái tạo sau 3 tháng, cần giữ dữ liệu nguồn, các snapshot/log Delta tương ứng, manifest JSON/Parquet, MSSV **`2A202602615`**, phiên bản mã và cấu hình xử lý; lineage giúp chọn đúng đầu vào và SHA-256 giúp đối chiếu video.
+Lineage hiện không tự lưu MSSV, phiên bản mã hay toàn bộ ngưỡng xử lý, nên cần lưu kèm báo cáo, cấu hình và commit Git. Chỉ giữ số version Delta sau khi reset/xoá lake thì không thể đọc lại snapshot cũ.
 
 ## Bước 5 · Điều phối và phục vụ
 

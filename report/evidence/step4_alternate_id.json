@@ -1,0 +1,15 @@
+{
+  "student_id": "2A202602615-test",
+  "dataset_version": "cafe62e1005c",
+  "frames": 1019,
+  "by_split": {
+    "train": 693,
+    "test": 151,
+    "val": 175
+  },
+  "trips_by_split": {
+    "val": 4,
+    "test": 4,
+    "train": 18
+  }
+}
