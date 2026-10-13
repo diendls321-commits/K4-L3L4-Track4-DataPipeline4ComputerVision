@@ -1,0 +1,18 @@
+> Khung tối và các điều kiện giữ ảnh
+SQL: select drive_id, count(*) filter (where is_dark) as dark_flagged, count(*) filter (where is_dark and not is_blurry and not is_near_dup and not sync_lost) as dark_eligible_for_gold, count(*) filter (where not is_black and not is_blurry and not is_near_dup and not sync_lost) as eligible_for_gold from silver.silver_frame_telemetry group by 1 order by 1
+drive_id  dark_flagged  dark_eligible_for_gold  eligible_for_gold
+--------  ------------  ----------------------  -----------------
+drive_a   4             4                       436
+drive_b   61            58                      583
+
+Physical partition columns: ['drive_id']
+Last two Delta writes: [{'version': 27, 'operation': 'WRITE', 'operationParameters': {'partitionBy': '["drive_id"]', 'mode': 'Overwrite', 'predicate': "trip_id = 'trip-00003'"}, 'operationMetrics': {'num_added_files': 1, 'num_removed_files': 1, 'num_partitions': 0, 'num_added_rows': 60, 'execution_time_ms': 15, 'num_retries': 0}}, {'version': 26, 'operation': 'WRITE', 'operationParameters': {'mode': 'Overwrite', 'partitionBy': '["drive_id"]', 'predicate': "trip_id = 'trip-00003'"}, 'operationMetrics': {'num_added_files': 1, 'num_removed_files': 1, 'num_partitions': 0, 'num_added_rows': 60, 'execution_time_ms': 54, 'num_retries': 0}}]
+
+> Các ví dụ đầu tiên của khung đen và tối ở mỗi drive
+SQL: select drive_id, frame_id, round(brightness,2) as brightness, is_black, is_dark, is_blurry, is_near_dup, sync_lost from silver.silver_frame_telemetry where is_black or is_dark qualify row_number() over (partition by drive_id, is_black order by frame_idx) = 1 order by drive_id, is_black
+drive_id  frame_id       brightness  is_black  is_dark  is_blurry  is_near_dup  sync_lost
+--------  -------------  ----------  --------  -------  ---------  -----------  ---------
+drive_a   drive_a-00545  39.65       False     True     False      False        False
+drive_a   drive_a-01001  0.0         True      False    False      False        False
+drive_b   drive_b-00030  23.07       False     True     False      False        False
+drive_b   drive_b-00600  0.0         True      False    False      False        False

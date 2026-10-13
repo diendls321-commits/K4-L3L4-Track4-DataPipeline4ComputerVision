@@ -75,18 +75,30 @@ Bằng chứng gắn với MSSV `2A202602615` được lưu tại [`break_gate.j
 ### Câu 4
 Dựa vào `idempotency.json`: số dòng trước và sau hai lần chạy lại, và khi ghi kiểu `append`. Vì sao Delta `overwrite` theo partition (một trip) an toàn hơn xoá rồi ghi lại, nhất là khi giữa chừng có lỗi?
 
-(trả lời ở đây)
+Thí nghiệm chạy lại `trip-00003` (60 khung) hai lần: toàn bảng `silver.frames` vẫn **1.246 dòng**, dấu vân tay trước/sau đều là **`6c7480dfde7e`**; `unchanged=true` trong [`idempotency.json`](report/evidence/idempotency.json).
+Trong bảng thử riêng, ghi `append` hai lần tạo **120 dòng** từ 60 khung, tức nhân đôi dữ liệu; pipeline tránh việc này bằng cách thay thế đúng tập dòng có `trip_id = 'trip-00003'`.
+Delta công bố việc thay thế qua một commit nguyên tử: người đọc thấy phiên bản cũ hoặc mới, tránh trạng thái đã xoá dữ liệu nhưng chưa ghi xong như cách xoá rồi ghi lại bằng hai thao tác.
+Nếu lần ghi chưa commit thành công thì phiên bản bảng cũ vẫn đọc được; chạy lại với cùng predicate thay thế dữ liệu của trip đó, đồng thời giữ dữ liệu của các trip khác.
+Lịch sử Delta ghi nhận hai lần `Overwrite` ở version 26 và 27, mỗi lần thêm 60 dòng và có đúng predicate trên. Trip là đơn vị xử lý/thay thế; partition vật lý của bảng thực tế là `drive_id`.
+Dấu vân tay thí nghiệm kiểm tra ID khung/trip, độ sáng, độ nét và dHash; không so `_processed_at` vì thời điểm xử lý thay đổi. Tính nguyên tử nói trên áp dụng cho bảng Delta; upload các ảnh JPG là thao tác riêng.
+Bước 3 đạt **6/6 checks passed**, `dbt test` đạt **8 PASS**, và cả **9 unit test** đều qua; log được lưu trong [`step3_frames.txt`](report/evidence/step3_frames.txt), [`step3_unit_tests.txt`](report/evidence/step3_unit_tests.txt) và [`step3_observations.txt`](report/evidence/step3_observations.txt).
 
 ### Câu 5
 Khung hình **đen** và khung hình **tối** khác nhau thế nào, pipeline xử lý khác nhau ra sao, bạn có đồng ý không? Dựa vào `threshold.json`: nếu chọn ngưỡng 0, 2, 6 thì bao nhiêu khung bị coi là trùng ở mỗi drive? Bạn chọn ngưỡng nào, vì sao, và ngưỡng đó phụ thuộc vào tốc độ xe thế nào?
 
 | dHash khác tối đa | số khung trùng, drive A | số khung trùng, drive B |
 |---|---|---|
-| 0 | | |
-| 2 | | |
-| 6 | | |
+| 0 | 61 | 8 |
+| 2 | 149 | 53 |
+| 6 | 363 | 244 |
 
-(trả lời ở đây)
+Khung **đen** có độ sáng trung bình dưới 12, gần như không có thông tin; pipeline gắn `is_black` để loại khỏi Gold. Khung **tối** có độ sáng từ 12 đến dưới 40, vẫn có thể chứa cảnh đường hầm/bóng râm nên gắn `is_dark` và không loại chỉ vì thiếu sáng.
+Trong 602 khung của A có 6 đen, 9 mờ, 4 tối, 149 gần trùng; trong 644 khung của B có 4 đen, 0 mờ, 61 tối, 53 gần trùng. Các cờ có thể chồng lấp; mỗi drive có 7 khung mất đồng bộ.
+Tôi đồng ý giữ các cảnh tối để dataset phản ánh điều kiện thực tế; giữ vì tối không có nghĩa bỏ qua cờ khác: A có 4/4 khung tối đủ điều kiện vào Gold, B có 58/61 khung tối đủ điều kiện.
+Bảng trên lấy từ [`threshold.json`](report/evidence/threshold.json): dHash so với khung liền trước trong cùng trip; tăng ngưỡng làm nhiều khung bị coi là gần trùng hơn.
+Tôi chọn ngưỡng **2 bit** đang dùng: ngưỡng 0 quá chặt với nhiễu nhỏ, còn ngưỡng 6 gắn cờ khoảng 60% khung A và 38% khung B, có nguy cơ bỏ nhiều thay đổi cảnh hữu ích; đây là lựa chọn cân bằng cần kiểm tra thêm bằng ảnh.
+Ở tốc độ lấy mẫu 2 khung/giây, xe chạy chậm tạo nhiều khung gần giống nên dễ bị gắn cờ; khi xe chạy nhanh, cảnh đổi nhanh hơn và khoảng cách dHash có thể tăng. Không nên tăng ngưỡng chỉ vì xe nhanh; cần đánh giá cảnh và khoảng thời gian lấy mẫu để tránh loại nhầm.
+Join ASOF theo event time cho độ trễ trung bình A/B **66/73 ms**; cực đại **2.884/3.112 ms** cho thấy các đoạn mất tín hiệu. Bằng chứng bổ sung nằm trong [`step3_threshold.txt`](report/evidence/step3_threshold.txt) và [`step3_observations.txt`](report/evidence/step3_observations.txt).
 
 ## Bước 4 · Gold
 
