@@ -7,14 +7,14 @@
 | Họ và tên | Nguyễn Văn Diện |
 | MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602615` |
 | GitHub | `diendls321-commits` |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `trip-02134` (lấy toàn bộ chữ số MSSV: `2202602615 % 26 = 5`, theo lựa chọn của sinh viên) |
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `b3bd5bc6347a` (đã kiểm chứng ở bước 4; khớp `report/evidence/run_summary.json` từ bước 0).
+- `dataset_version` của bạn: `b3bd5bc6347a` (giữ nguyên sau bài tập sập/chạy lại và lần chạy cuối `step all --reset`; khớp `report/evidence/run_summary.json`).
 - Số khung hình train / val / test của bạn: **692 / 172 / 155** (tổng **1.019** khung, thuộc 26 trip).
-- `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
-- Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
+- Kiểm tra cuối: **27/27 checks passed**, cả năm bước đều đạt; xem [`report/verify.txt`](report/verify.txt) và [`final_pipeline.txt`](report/evidence/final_pipeline.txt).
+- Ảnh trong `report/screenshots/`: Graph lần chạy đầu `airflow_graph.png`, log lỗi `airflow_crash_log.jpg`, Graph khôi phục `airflow_recovered.jpg`, `minio_lake.jpg`, `metabase_dashboard.jpg` và `metabase_question.jpg`.
 
 ## Bước 1 · Bronze
 
@@ -147,21 +147,55 @@ Lineage hiện không tự lưu MSSV, phiên bản mã hay toàn bộ ngưỡng 
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+MSSV chứa chữ nên bài dùng quy ước đã ghi ở đầu báo cáo: lấy các chữ số `2202602615`, chia dư 26 được **5**, chọn `trip-02134` trong danh sách đã sắp xếp.
+Ở run `manual__dien_fail_pipeline_20261013T043615`, **1 task đỏ** là `silver_frames[5]`; **7 task `upstream_failed`** là hai cặp dbt run/test và ba task publish/export; **29 task** còn lại đã thành công. Log lần thử 1 ghi `simulated crash while extracting trip-02134; run it again`.
+Clear riêng task đỏ làm `silver_frames[5]` thành công ở **lần thử 2**, nhưng 7 task đã mang trạng thái kết thúc `upstream_failed` vẫn bị chặn. Vì vậy phải clear thêm đúng 7 task này để chúng chạy lần đầu; không chạy lại 25 trip thành công, ba task Bronze hay `trip_commands`.
+Kết quả là **37/37 task success**: chỉ **1 task thực sự chạy lại**, còn 7 task phía sau được thực thi lần đầu. Đây là khác biệt quan sát được so với hướng dẫn rút gọn “chỉ clear task đỏ thì DAG xanh”; hai thao tác clear đều có bằng chứng riêng.
+Silver có **1.246 dòng / 1.246 frame_id khác nhau**, riêng trip lỗi có **60 khung**; Gold có **1.019 dòng / 1.019 frame_id khác nhau**, nên không nhân đôi. `dataset_version` vẫn **`b3bd5bc6347a`** như lần DAG ban đầu, và verify đạt **27/27**.
+Bằng chứng: [`step5_airflow_failed.json`](report/evidence/step5_airflow_failed.json), [`step5_after_clear_one.json`](report/evidence/step5_after_clear_one.json), [`step5_clear_blocked_downstream.json`](report/evidence/step5_clear_blocked_downstream.json), [`step5_airflow_recovered.json`](report/evidence/step5_airflow_recovered.json) và [`step5_recovery_validation.json`](report/evidence/step5_recovery_validation.json).
+Ảnh [`log lần thử 1 bị lỗi`](report/screenshots/airflow_crash_log.jpg) thấy đúng trip và ô đỏ của lần thử 1; ảnh [`Graph sau khôi phục`](report/screenshots/airflow_recovered.jpg) xanh toàn bộ. Sau thí nghiệm đã bỏ `LAB_FAIL_ONCE` khỏi `.env`, áp dụng lại Docker và chạy toàn bộ pipeline từ lake trống thành công.
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Ba nút thắt dự kiến dưới đây được suy ra từ mã và cấu hình lab; chưa phải kết quả đo tải 500 xe/ngày. Cần biết thêm thời lượng video mỗi xe, số camera và hạn xử lý để tính công suất thực tế.
+
+| Thành phần | Giới hạn thấy trong lab | Hướng nâng cấp |
+|---|---|---|
+| Giải mã video / Airflow worker | `LocalExecutor`, tổng parallelism 2, riêng `silver_frames` chỉ cho một task chạy mỗi DAG run; mỗi trip tải lại cả video drive rồi dùng FFmpeg lấy 2 fps. CPU, tải lặp và hàng đợi sẽ tăng nhanh. | Tách worker giải mã theo trip/đoạn video trên nhiều máy, cache hoặc đọc đoạn cần thiết; mở rộng worker theo hàng đợi và quản lý số lần ghi đồng thời vào Delta. Airflow tiếp tục điều phối. |
+| Biến đổi và join / DuckDB | Một file DuckDB, dbt chạy một thread, các bảng và mart được dựng lại; CPU, RAM và đường ghi của một máy giới hạn lượng dữ liệu xử lý trong ngày. | Xử lý tăng dần theo ngày/xe/trip; khi đo tải vượt khả năng một máy, dùng Spark với Delta cho biến đổi/join phân tán, giữ nguyên các quality gate và khoá chống trùng. |
+| Lưu trữ và phục vụ dữ liệu / MinIO–Postgres | MinIO một máy, nhiều JPG nhỏ; Gold sao chép từng ảnh; sáu mart được thay toàn bộ trong Postgres giới hạn 512 MB, dùng chung máy với Airflow/Metabase. I/O, dung lượng và truy vấn BI cạnh tranh tài nguyên. | Dùng object storage có khả năng mở rộng, phân vùng và chính sách vòng đời; cân nhắc đóng gói ảnh theo shard cho huấn luyện. Tách warehouse khỏi metadata Airflow/Metabase, nạp tăng dần và phục vụ BI từ bảng tổng hợp. |
+
+Cách phân tích nối kiến trúc tổng thể với lựa chọn engine và mở rộng xử lý ở slide 12, 22, 23: đo CPU/RAM/I/O, độ dài hàng đợi và thời gian từng bước trước khi quyết định thay thành phần nào. Dù mở rộng, vẫn phải giữ xử lý idempotent theo trip, lineage và split theo trip.
 
 ## Câu hỏi riêng của bạn trên Metabase
 
 Câu SQL bạn thêm vào dashboard và điều nó cho biết:
 
-(trả lời ở đây)
+**Câu hỏi:** Những trip nào có tỷ lệ khung hình bị loại cao nhất, và chúng có tốc độ trung bình/điều kiện ghi hình thế nào?
+
+Đã lưu câu hỏi [“Trips: tỷ lệ khung bị loại cao nhất”](http://localhost:3000/question/46) và thêm vào [dashboard Day 9](http://localhost:3000/dashboard/2):
+
+```sql
+SELECT drive_id, trip_id, frames, frames_kept,
+       frames - frames_kept AS frames_dropped,
+       ROUND(100.0 * (frames - frames_kept) / NULLIF(frames, 0), 2) AS drop_pct,
+       avg_speed_kmh, lighting, conditions
+FROM marts.mart_trip_summary
+ORDER BY drop_pct DESC, trip_id
+LIMIT 10;
+```
+
+Kết quả cao nhất là **`drive_a / trip-04622`: 60 khung, giữ 26, loại 34 (56,67%)**, tốc độ trung bình **67,1 km/h**; tiếp theo là `trip-03904` **50%** và `trip-02086` **46,67%**.
+Tỷ lệ này đếm số khung thực sự không vào Gold, tránh cộng chồng các cờ lỗi. Nó giúp chọn trip cần xem ảnh/log trước; riêng tốc độ và nhãn Day/Clouds chưa đủ kết luận nguyên nhân bị loại.
+SQL và 10 dòng kết quả được lưu trong [`step5_metabase_question.json`](report/evidence/step5_metabase_question.json); xem ảnh [`dashboard`](report/screenshots/metabase_dashboard.jpg) và [`câu hỏi riêng`](report/screenshots/metabase_question.jpg).
 
 ## Nhìn lại
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
 
-(trả lời ở đây)
+Điểm đáng chú ý là khung tối không đồng nghĩa với khung hỏng: B có 61 khung tối nhưng 58 khung vẫn đủ điều kiện vào Gold.
+Bài tập Airflow cho thấy cần phân biệt task đã chạy lỗi với task chưa được chạy do `upstream_failed`; clear task lỗi chưa tự khôi phục mọi trạng thái kết thúc phía sau trong lần thử này.
+Ngưỡng dHash 2 bit hiện là lựa chọn hợp lý cho lab, nhưng vẫn cần kiểm tra ảnh theo tốc độ xe/cảnh để biết có bỏ nhầm thay đổi quan trọng hay không.
+Pipeline còn thiếu kiểm tra GPS nhảy bất thường hoặc toạ độ ngoài phạm vi hợp lệ: tốc độ hợp lệ và timestamp đúng chưa đảm bảo vị trí xe đúng.
+Có thể bổ sung kiểm tra phạm vi lat/lon và tính nhất quán giữa quãng đường GPS, thời gian và tốc độ; các dòng nghi ngờ cần được gắn cờ/cách ly để xem lại.

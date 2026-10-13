@@ -1,0 +1,7 @@
+{
+  "student_id": "2A202602615",
+  "baseline_reset": "manual__dien_step5_reset_20261013T043006",
+  "baseline_pipeline": "manual__dien_step5_pipeline_20261013T043006",
+  "failure_reset": "manual__dien_fail_reset_20261013T043615",
+  "failure_pipeline": "manual__dien_fail_pipeline_20261013T043615"
+}

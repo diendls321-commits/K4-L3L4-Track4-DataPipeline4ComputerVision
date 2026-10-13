@@ -1,0 +1,16 @@
+{
+  "student_id": "2A202602615",
+  "trip": "trip-02134",
+  "silver_frames": 1246,
+  "silver_unique_frame_ids": 1246,
+  "trip_frames": 60,
+  "gold_frames": 1019,
+  "gold_unique_frame_ids": 1019,
+  "dataset_versions": [
+    "b3bd5bc6347a"
+  ],
+  "baseline_dataset_version": "b3bd5bc6347a",
+  "unchanged_version": true,
+  "no_duplicates": true,
+  "verify_all_passed": true
+}

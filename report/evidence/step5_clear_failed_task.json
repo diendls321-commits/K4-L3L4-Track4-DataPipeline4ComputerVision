@@ -1,0 +1,37 @@
+{
+  "method": "Airflow REST API (browser control unavailable)",
+  "map_index_verified_in_metadata": 5,
+  "request": {
+    "task_ids": [
+      "silver_frames"
+    ],
+    "dag_run_id": "manual__dien_fail_pipeline_20261013T043615",
+    "only_failed": true,
+    "include_upstream": false,
+    "include_downstream": false,
+    "include_past": false,
+    "include_future": false,
+    "reset_dag_runs": true,
+    "dry_run": false
+  },
+  "preview": {
+    "task_instances": [
+      {
+        "dag_id": "day09_video_pipeline",
+        "dag_run_id": "manual__dien_fail_pipeline_20261013T043615",
+        "execution_date": "2026-10-13T04:36:24+00:00",
+        "task_id": "silver_frames"
+      }
+    ]
+  },
+  "response": {
+    "task_instances": [
+      {
+        "dag_id": "day09_video_pipeline",
+        "dag_run_id": "manual__dien_fail_pipeline_20261013T043615",
+        "execution_date": "2026-10-13T04:36:24+00:00",
+        "task_id": "silver_frames"
+      }
+    ]
+  }
+}

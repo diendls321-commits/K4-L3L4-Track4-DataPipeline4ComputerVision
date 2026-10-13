@@ -1,0 +1,119 @@
+{
+  "student_id": "2A202602615",
+  "dashboard_url": "http://localhost:3000/dashboard/2",
+  "question_url": "http://localhost:3000/question/46",
+  "name": "Trips: tỷ lệ khung bị loại cao nhất",
+  "sql": "SELECT drive_id, trip_id, frames, frames_kept,\n       frames - frames_kept AS frames_dropped,\n       ROUND(100.0 * (frames - frames_kept) / NULLIF(frames, 0), 2) AS drop_pct,\n       avg_speed_kmh, lighting, conditions\nFROM marts.mart_trip_summary\nORDER BY drop_pct DESC, trip_id\nLIMIT 10;",
+  "rows": [
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-04622",
+      "frames": 60,
+      "frames_kept": 26,
+      "frames_dropped": 34,
+      "drop_pct": 56.67,
+      "avg_speed_kmh": 67.1,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-03904",
+      "frames": 22,
+      "frames_kept": 11,
+      "frames_dropped": 11,
+      "drop_pct": 50.0,
+      "avg_speed_kmh": 46.1,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-02086",
+      "frames": 60,
+      "frames_kept": 32,
+      "frames_dropped": 28,
+      "drop_pct": 46.67,
+      "avg_speed_kmh": 17.6,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-08888",
+      "frames": 60,
+      "frames_kept": 36,
+      "frames_dropped": 24,
+      "drop_pct": 40.0,
+      "avg_speed_kmh": 6.5,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-07774",
+      "frames": 34,
+      "frames_kept": 21,
+      "frames_dropped": 13,
+      "drop_pct": 38.24,
+      "avg_speed_kmh": 12.8,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-06570",
+      "frames": 45,
+      "frames_kept": 32,
+      "frames_dropped": 13,
+      "drop_pct": 28.89,
+      "avg_speed_kmh": 30.0,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_b",
+      "trip_id": "trip-04871",
+      "frames": 60,
+      "frames_kept": 43,
+      "frames_dropped": 17,
+      "drop_pct": 28.33,
+      "avg_speed_kmh": 58.3,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_b",
+      "trip_id": "trip-08448",
+      "frames": 60,
+      "frames_kept": 45,
+      "frames_dropped": 15,
+      "drop_pct": 25.0,
+      "avg_speed_kmh": 91.2,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-00003",
+      "frames": 60,
+      "frames_kept": 46,
+      "frames_dropped": 14,
+      "drop_pct": 23.33,
+      "avg_speed_kmh": 63.2,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    },
+    {
+      "drive_id": "drive_a",
+      "trip_id": "trip-02097",
+      "frames": 36,
+      "frames_kept": 29,
+      "frames_dropped": 7,
+      "drop_pct": 19.44,
+      "avg_speed_kmh": 36.2,
+      "lighting": "Day",
+      "conditions": "Clouds"
+    }
+  ]
+}
