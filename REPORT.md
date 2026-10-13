@@ -46,12 +46,29 @@ Bước 1 đạt **5/5 checks passed**; đầu ra và truy vấn kiểm chứng 
 ### Câu 2
 Pipeline đưa hai nguồn về một schema như thế nào (đơn vị, kiểu thời gian, **độ lệch đồng hồ**)? Bằng chứng nào trong kết quả bước 2 cho thấy đã đúng? Dán bảng quarantine của bạn (số dòng theo từng lý do, từng drive) và giải thích vì sao dòng lỗi vào `rejects` thay vì bị xoá.
 
-(trả lời ở đây)
+Staging giữ tốc độ A ở m/s, đổi tốc độ B từ km/h sang m/s bằng cách chia 3,6; đổi bàn đạp B từ % sang tỷ lệ bằng cách chia 100 và ánh xạ tên cột về schema của A.
+Thời gian A được ép sang timestamp có múi giờ; B được trừ `telemetry_clock_offset_ms=1500` trước khi đổi epoch mili giây sang timestamp UTC, rồi hai nguồn được hợp nhất theo tên cột.
+Mẫu sạch đầu tiên của B là `2025-10-08 14:30:00.009000+00:00`, chỉ sau mốc bắt đầu video `14:30:00 UTC` 9 ms; tốc độ tối đa làm tròn của A/B là 71/100 km/h.
+
+| Drive | Trùng (`duplicate`) | Thiếu tốc độ (`speed_missing`) | Tốc độ vô lý (`speed_out_of_range`) | Tổng cách ly |
+|---|---:|---:|---:|---:|
+| `drive_a` | 20 | 30 | 3 | 53 |
+| `drive_b` | 20 | 30 | 3 | 53 |
+| **Tổng** | **40** | **60** | **6** | **106** |
+
+Dữ liệu được bảo toàn: A có 2.968 dòng sạch + 53 dòng cách ly = 3.021 dòng nhận vào; B có 3.181 + 53 = 3.234; tổng sạch là 6.149 dòng.
+Các dòng lỗi nằm trong `silver.silver_telemetry_rejects`, kèm lý do, `_batch_id` và `_row_no`, để truy lại nguồn và xử lý lại khi cần thay vì xoá mất bằng chứng.
+Bước 2 đạt **7/7 checks passed**; `dbt test` đạt `PASS=6 WARN=1 ERROR=0 SKIP=0`. Đầu ra được lưu trong [`step2_telemetry.txt`](report/evidence/step2_telemetry.txt).
 
 ### Câu 3
 Vì sao test `max_gap_ms` là `warn` còn `in_range` là `error`? Kết quả thí nghiệm `break-gate` của bạn (`break_gate.json`): test nào bắt được, bao nhiêu dòng, và điều đó cho biết gì về vai trò của "cổng chất lượng"?
 
-(trả lời ở đây)
+Trong `dbt/models/schema.yml`, `max_gap_ms` kiểm tra khoảng cách giữa hai mẫu liên tiếp vượt 1.000 ms và được đặt rõ `severity: warn`: mỗi drive có một khoảng vượt ngưỡng, dài 3.073 ms ở A và 3.124 ms ở B; lab chấp nhận mất tín hiệu này nhưng cần cảnh báo để theo dõi và xử lý đồng bộ ở bước sau.
+`in_range` giới hạn tốc độ trong 0–70 m/s và dùng mức mặc định `error`; tốc độ vô lý có thể làm sai dữ liệu huấn luyện nên phải chặn các task phía sau khi cổng kiểm tra thất bại.
+Thí nghiệm nới luật phân loại lên 1.000 m/s nhưng giữ nguyên test 70 m/s: `in_range_silver_telemetry_speed_mps__70__0` bắt được **6 dòng**, cho kết quả `PASS=5 WARN=1 ERROR=1 SKIP=0`.
+Kết quả cho thấy cổng chất lượng kiểm tra độc lập với luật làm sạch: dù luật bị nới sai, dữ liệu xấu vẫn bị phát hiện trước khi đi tiếp.
+Sau khi khôi phục luật 70 m/s, test trở lại `PASS=6 WARN=1 ERROR=0 SKIP=0`; WARN về mất tín hiệu vẫn còn và không làm lần chạy thất bại.
+Bằng chứng gắn với MSSV `2A202602615` được lưu tại [`break_gate.json`](report/evidence/break_gate.json), cùng [`step2_break_gate.txt`](report/evidence/step2_break_gate.txt) và [`step2_observations.txt`](report/evidence/step2_observations.txt).
 
 ## Bước 3 · Silver frames
 

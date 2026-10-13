@@ -1,0 +1,30 @@
+> Cân bằng số dòng sau khi khôi phục
+SQL: select drive_id, count(*) as clean_rows, min(ts) as first_ts, round(max(speed_mps)*3.6, 3) as max_kmh from silver.silver_telemetry group by 1 order by 1
+drive_id  clean_rows  first_ts                          max_kmh
+--------  ----------  --------------------------------  -------
+drive_a   2968        2025-10-07 08:00:00.014000+00:00  71.345
+drive_b   3181        2025-10-08 14:30:00.009000+00:00  100.19
+
+> Các khoảng mất tín hiệu gây WARN
+SQL: with gaps as (select drive_id, date_diff('millisecond', lag(ts) over (partition by drive_id order by ts), ts) as gap_ms from silver.silver_telemetry) select drive_id, count(*) filter (where gap_ms > 1000) as gaps_over_1000ms, max(gap_ms) as max_gap_ms from gaps group by 1 order by 1
+drive_id  gaps_over_1000ms  max_gap_ms
+--------  ----------------  ----------
+drive_a   1                 3073
+drive_b   1                 3124
+
+> Chứng minh đã khôi phục luật 70 m/s
+SQL: select count(*) as total_clean, count(*) filter (where speed_mps < 0 or speed_mps > 70) as invalid_speed_rows from silver.silver_telemetry
+total_clean  invalid_speed_rows
+-----------  ------------------
+6149         0
+
+> Quarantine sau thí nghiệm
+SQL: select drive_id, reject_reason, count(*) as rows from silver.silver_telemetry_rejects group by 1,2 order by 1,2
+drive_id  reject_reason       rows
+--------  ------------------  ----
+drive_a   duplicate           20
+drive_a   speed_missing       30
+drive_a   speed_out_of_range  3
+drive_b   duplicate           20
+drive_b   speed_missing       30
+drive_b   speed_out_of_range  3
